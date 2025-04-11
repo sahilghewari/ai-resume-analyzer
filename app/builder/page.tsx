@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Save, Download, Eye, EyeOff, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,6 +19,21 @@ import { motion, AnimatePresence } from "framer-motion"
 import AnimatedInput from "@/components/animations/animated-input"
 import TemplateSwitcher from "@/components/animations/template-switcher"
 import AISuggestion from "@/components/animations/ai-suggestion"
+
+import { 
+  SavedResume,
+  createNewResume,
+  getCurrentResume,
+  setCurrentResume,
+  saveResume,
+  getAutoSaveDebounce
+} from "@/lib/resumeStorage"
+import { toast } from "@/components/ui/use-toast"
+import { emptyResumeData } from "@/lib/initialState"
+
+import { templates } from "@/components/templates"
+import { TemplateCard } from "@/components/templates/template-card"
+import { TemplateRenderer } from "@/components/templates/template-renderer"
 
 interface ResumeData {
   personalInfo: {
@@ -61,66 +76,7 @@ interface ResumeData {
 export default function ResumeBuilder() {
   const [activeTemplate, setActiveTemplate] = useState("modern")
   const [previewMode, setPreviewMode] = useState(false)
-  const [resumeData, setResumeData] = useState<ResumeData>({
-    personalInfo: {
-      name: "John Doe",
-      email: "john.doe@example.com",
-      phone: "(123) 456-7890",
-      location: "New York, NY",
-      linkedin: "linkedin.com/in/johndoe",
-      website: "johndoe.com",
-    },
-    summary:
-      "Experienced software engineer with a passion for building scalable web applications and solving complex problems.",
-    experience: [
-      {
-        id: "1",
-        title: "Senior Software Engineer",
-        company: "Tech Solutions Inc.",
-        location: "New York, NY",
-        startDate: "2020-01",
-        endDate: "",
-        current: true,
-        description:
-          "Led development of cloud-based applications. Implemented CI/CD pipelines. Mentored junior developers.",
-      },
-      {
-        id: "2",
-        title: "Software Developer",
-        company: "Digital Innovations",
-        location: "Boston, MA",
-        startDate: "2017-06",
-        endDate: "2019-12",
-        current: false,
-        description:
-          "Developed and maintained web applications using React and Node.js. Collaborated with design team to implement UI/UX improvements.",
-      },
-    ],
-    education: [
-      {
-        id: "1",
-        degree: "Bachelor of Science in Computer Science",
-        institution: "University of Technology",
-        location: "Boston, MA",
-        graduationDate: "2017-05",
-        description:
-          "GPA: 3.8/4.0. Relevant coursework: Data Structures, Algorithms, Web Development, Database Systems.",
-      },
-    ],
-    skills: ["JavaScript", "React", "Node.js", "TypeScript", "Python", "SQL", "Git", "AWS", "Docker", "CI/CD"],
-    projects: [
-      {
-        id: "1",
-        title: "E-commerce Platform",
-        description:
-          "Built a full-stack e-commerce platform with user authentication, product catalog, and payment processing.",
-        technologies: "React, Node.js, MongoDB, Stripe API",
-        link: "github.com/johndoe/ecommerce",
-      },
-    ],
-  })
-
-  // Add this state for AI suggestions after the existing state variables
+  const [resumeData, setResumeData] = useState(emptyResumeData)
   const [aiSuggestions, setAiSuggestions] = useState<
     Array<{
       id: string
@@ -128,26 +84,84 @@ export default function ResumeBuilder() {
       field: string
       value: string
     }>
-  >([
-    {
-      id: "1",
-      text: "Add more quantifiable achievements to your Senior Software Engineer role.",
-      field: "experience",
-      value:
-        "Led development of cloud-based applications resulting in 40% improved deployment efficiency. Implemented CI/CD pipelines reducing build times by 65%. Mentored 5 junior developers who were all promoted within a year.",
-    },
-  ])
+  >([])
 
-  const handlePersonalInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setResumeData({
-      ...resumeData,
-      personalInfo: {
-        ...resumeData.personalInfo,
-        [name]: value,
-      },
+  const [currentResume, setCurrentResumeState] = useState<SavedResume>(createNewResume())
+  
+  // Initialize or load saved resume
+  useEffect(() => {
+    const saved = getCurrentResume()
+    if (saved) {
+      setCurrentResumeState(saved)
+      setResumeData(saved.data)
+      setActiveTemplate(saved.templateId)
+    } else {
+      // If no saved resume, start with empty state
+      setResumeData(emptyResumeData)
+    }
+  }, [])
+
+  // Auto-save functionality
+  const autoSave = getAutoSaveDebounce(() => {
+    const updatedResume = {
+      ...currentResume,
+      lastModified: Date.now(),
+      data: resumeData,
+      templateId: activeTemplate
+    }
+    saveResume(updatedResume)
+    setCurrentResume(updatedResume)
+    toast({
+      title: "Progress saved",
+      description: "Your resume has been automatically saved",
+      duration: 2000
+    })
+  })
+
+  // Update auto-save when data changes
+  useEffect(() => {
+    autoSave()
+  }, [resumeData, activeTemplate])
+
+  const handleSaveResume = () => {
+    const updatedResume = {
+      ...currentResume,
+      lastModified: Date.now(),
+      data: resumeData,
+      templateId: activeTemplate
+    }
+    saveResume(updatedResume)
+    setCurrentResume(updatedResume)
+    toast({
+      title: "Resume saved",
+      description: "Your resume has been saved successfully",
+      duration: 3000
     })
   }
+
+  const createNewResumeHandler = () => {
+    const newResume = createNewResume()
+    setCurrentResumeState(newResume)
+    setResumeData(emptyResumeData)
+    setActiveTemplate('modern')
+    toast({
+      title: "New resume created",
+      description: "Started a new resume",
+      duration: 3000
+    })
+  }
+
+  const handlePersonalInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    console.log('Updating:', name, value); // Add logging to debug
+    setResumeData((prev) => ({
+      ...prev,
+      personalInfo: {
+        ...prev.personalInfo,
+        [name]: value,
+      },
+    }));
+  };
 
   const handleSummaryChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setResumeData({
@@ -317,11 +331,25 @@ export default function ResumeBuilder() {
                   </>
                 )}
               </Button>
-              <Button variant="outline" className="border-teal-600 text-teal-600 hover:bg-teal-50">
+              <Button 
+                variant="outline" 
+                className="border-brand-600 text-brand-600 hover:bg-brand-50"
+                onClick={handleSaveResume}
+              >
                 <Save className="mr-2 h-4 w-4" />
                 Save
               </Button>
-              <Button className="bg-teal-600 hover:bg-teal-700" onClick={downloadResume}>
+              <Button 
+                variant="outline"
+                onClick={createNewResumeHandler}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Resume
+              </Button>
+              <Button 
+                className="bg-brand-600 hover:bg-brand-700" 
+                onClick={downloadResume}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Download PDF
               </Button>
@@ -350,17 +378,19 @@ export default function ResumeBuilder() {
                           <AnimatedInput
                             id="name"
                             label="Full Name"
-                            value={resumeData.personalInfo.name}
-                            onChange={handlePersonalInfoChange}
+                            value={resumeData.personalInfo.name || ''}
+                            onChange={(e) => handlePersonalInfoChange(e)}
                             name="name"
+                            placeholder="Enter your full name"
                           />
                           <AnimatedInput
                             id="email"
                             label="Email"
                             type="email"
-                            value={resumeData.personalInfo.email}
-                            onChange={handlePersonalInfoChange}
+                            value={resumeData.personalInfo.email || ''}
+                            onChange={(e) => handlePersonalInfoChange(e)}
                             name="email"
+                            placeholder="Enter your email"
                           />
                           <AnimatedInput
                             id="phone"
@@ -700,35 +730,16 @@ export default function ResumeBuilder() {
                       {/* Replace the template selection tab content with our animated version */}
                       <TabsContent value="template">
                         <div className="space-y-6">
-                          <div className="space-y-2">
-                            <Label htmlFor="template">Resume Template</Label>
-                            <Select value={activeTemplate} onValueChange={setActiveTemplate}>
-                              <SelectTrigger id="template">
-                                <SelectValue placeholder="Select a template" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="modern">Modern</SelectItem>
-                                <SelectItem value="professional">Professional</SelectItem>
-                                <SelectItem value="creative">Creative</SelectItem>
-                                <SelectItem value="minimal">Minimal</SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {templates.map((template) => (
+                              <TemplateCard
+                                key={template.id}
+                                {...template}
+                                isActive={activeTemplate === template.id}
+                                onClick={() => setActiveTemplate(template.id)}
+                              />
+                            ))}
                           </div>
-
-                          <TemplateSwitcher
-                            templates={[
-                              { id: "modern", name: "Modern", image: "/placeholder.svg?height=200&width=150" },
-                              {
-                                id: "professional",
-                                name: "Professional",
-                                image: "/placeholder.svg?height=200&width=150",
-                              },
-                              { id: "creative", name: "Creative", image: "/placeholder.svg?height=200&width=150" },
-                              { id: "minimal", name: "Minimal", image: "/placeholder.svg?height=200&width=150" },
-                            ]}
-                            activeTemplate={activeTemplate}
-                            onSelect={setActiveTemplate}
-                          />
                         </div>
                       </TabsContent>
                     </Tabs>
@@ -738,173 +749,10 @@ export default function ResumeBuilder() {
             )}
 
             {/* Preview Section */}
-            {/* Add animations to the resume preview */}
             <div className={previewMode ? "col-span-2" : ""}>
               <Card className="bg-white shadow-md">
                 <CardContent className="p-8">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={activeTemplate}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.5 }}
-                      className={`resume-preview ${activeTemplate}`}
-                    >
-                      {/* Modern Template Preview */}
-                      {activeTemplate === "modern" && (
-                        <div className="space-y-6">
-                          <motion.div
-                            initial={{ y: -20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ duration: 0.5 }}
-                            className="border-b pb-6"
-                          >
-                            <h1 className="text-3xl font-bold text-teal-600">{resumeData.personalInfo.name}</h1>
-                            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 text-sm text-gray-600">
-                              <span>{resumeData.personalInfo.email}</span>
-                              <span>{resumeData.personalInfo.phone}</span>
-                              <span>{resumeData.personalInfo.location}</span>
-                              {resumeData.personalInfo.linkedin && <span>{resumeData.personalInfo.linkedin}</span>}
-                              {resumeData.personalInfo.website && <span>{resumeData.personalInfo.website}</span>}
-                            </div>
-                          </motion.div>
-
-                          <motion.div
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ duration: 0.5, delay: 0.1 }}
-                          >
-                            <h2 className="text-xl font-semibold text-gray-800 mb-2">Professional Summary</h2>
-                            <p className="text-gray-700">{resumeData.summary}</p>
-                          </motion.div>
-
-                          <motion.div
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ duration: 0.5, delay: 0.2 }}
-                          >
-                            <h2 className="text-xl font-semibold text-gray-800 mb-3">Experience</h2>
-                            <div className="space-y-4">
-                              {resumeData.experience.map((exp, index) => (
-                                <motion.div
-                                  key={exp.id}
-                                  initial={{ x: -20, opacity: 0 }}
-                                  animate={{ x: 0, opacity: 1 }}
-                                  transition={{ duration: 0.3, delay: 0.3 + index * 0.1 }}
-                                >
-                                  <div className="flex justify-between">
-                                    <h3 className="font-medium">{exp.title}</h3>
-                                    <span className="text-gray-600 text-sm">
-                                      {exp.startDate &&
-                                        new Date(exp.startDate).toLocaleDateString("en-US", {
-                                          year: "numeric",
-                                          month: "short",
-                                        })}{" "}
-                                      -
-                                      {exp.current
-                                        ? " Present"
-                                        : exp.endDate &&
-                                          new Date(exp.endDate).toLocaleDateString("en-US", {
-                                            year: "numeric",
-                                            month: "short",
-                                          })}
-                                    </span>
-                                  </div>
-                                  <p className="text-teal-600">
-                                    {exp.company}, {exp.location}
-                                  </p>
-                                  <p className="text-gray-700 mt-1">{exp.description}</p>
-                                </motion.div>
-                              ))}
-                            </div>
-                          </motion.div>
-
-                          {/* Continue with other sections with similar animations */}
-                          <motion.div
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ duration: 0.5, delay: 0.3 }}
-                          >
-                            <h2 className="text-xl font-semibold text-gray-800 mb-3">Education</h2>
-                            <div className="space-y-4">
-                              {resumeData.education.map((edu) => (
-                                <motion.div
-                                  key={edu.id}
-                                  initial={{ x: -20, opacity: 0 }}
-                                  animate={{ x: 0, opacity: 1 }}
-                                  transition={{ duration: 0.3, delay: 0.4 }}
-                                >
-                                  <div className="flex justify-between">
-                                    <h3 className="font-medium">{edu.degree}</h3>
-                                    <span className="text-gray-600 text-sm">
-                                      {edu.graduationDate &&
-                                        new Date(edu.graduationDate).toLocaleDateString("en-US", {
-                                          year: "numeric",
-                                          month: "short",
-                                        })}
-                                    </span>
-                                  </div>
-                                  <p className="text-teal-600">
-                                    {edu.institution}, {edu.location}
-                                  </p>
-                                  <p className="text-gray-700 mt-1">{edu.description}</p>
-                                </motion.div>
-                              ))}
-                            </div>
-                          </motion.div>
-
-                          <motion.div
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ duration: 0.5, delay: 0.4 }}
-                          >
-                            <h2 className="text-xl font-semibold text-gray-800 mb-3">Skills</h2>
-                            <div className="flex flex-wrap gap-2">
-                              {resumeData.skills.map((skill, index) => (
-                                <motion.span
-                                  key={index}
-                                  className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm"
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ duration: 0.3, delay: 0.5 + index * 0.05 }}
-                                >
-                                  {skill}
-                                </motion.span>
-                              ))}
-                            </div>
-                          </motion.div>
-
-                          {resumeData.projects.length > 0 && (
-                            <motion.div
-                              initial={{ y: 20, opacity: 0 }}
-                              animate={{ y: 0, opacity: 1 }}
-                              transition={{ duration: 0.5, delay: 0.5 }}
-                            >
-                              <h2 className="text-xl font-semibold text-gray-800 mb-3">Projects</h2>
-                              <div className="space-y-4">
-                                {resumeData.projects.map((project) => (
-                                  <motion.div
-                                    key={project.id}
-                                    initial={{ x: -20, opacity: 0 }}
-                                    animate={{ x: 0, opacity: 1 }}
-                                    transition={{ duration: 0.3, delay: 0.6 }}
-                                  >
-                                    <div className="flex justify-between">
-                                      <h3 className="font-medium">{project.title}</h3>
-                                      {project.link && <span className="text-teal-600 text-sm">{project.link}</span>}
-                                    </div>
-                                    <p className="text-gray-600 text-sm">{project.technologies}</p>
-                                    <p className="text-gray-700 mt-1">{project.description}</p>
-                                  </motion.div>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </div>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
+                  <TemplateRenderer template={activeTemplate} data={resumeData} />
                 </CardContent>
               </Card>
             </div>

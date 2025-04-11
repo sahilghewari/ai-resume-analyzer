@@ -9,6 +9,9 @@ import JobMatching from "@/app/ai-analyzer/components/job-matching"
 import AiEnhancement from "@/app/ai-analyzer/components/ai-enhancement"
 import CoverLetterGenerator from "@/app/ai-analyzer/components/cover-letter-generator"
 import { Button } from "@/components/ui/button";
+import Navbar from "@/components/navbar"
+import Footer from "@/components/footer"
+import { saveAnalysis } from "@/lib/historyStorage"
 
 import { pdfjs } from 'react-pdf';
 
@@ -268,6 +271,15 @@ export default function Home() {
         };
 
         setAnalysisResult(transformedData);
+        
+        // Save to history
+        saveAnalysis({
+          fileName: file?.name || 'Untitled Resume',
+          jobTitle: jobDescription.split('\n')[0]?.substring(0, 50) || 'Untitled Job',
+          atsScore: transformedData.atsScore,
+          analysisResult: transformedData
+        });
+
       } catch (error) {
         console.error('Analysis parsing failed:', error);
         setErrorMessage('Failed to analyze resume. Please try again.');
@@ -280,60 +292,64 @@ export default function Home() {
   };
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold tracking-tight mb-2">Resume Analyzer</h1>
-        <p className="text-muted-foreground">AI-powered resume analysis and enhancement</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <UploadSection 
-            onFileUpload={handleFileUpload}
-            onJobDescriptionChange={handleJobDescriptionChange}
-            onAnalyze={handleAnalysis}
-            isAnalyzing={isAnalyzing}
-            errorMessage={errorMessage}
-          />
+    <main className="">
+      <Navbar />
+      <div className="container mx-auto mt-6">
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Resume Analyzer</h1>
+          <p className="text-muted-foreground">AI-powered resume analysis and enhancement</p>
         </div>
 
-        <div className="lg:col-span-2">
-          <Tabs defaultValue="analysis" className="w-full">
-            <TabsList className="grid grid-cols-4 w-full">
-              <TabsTrigger value="analysis">Analysis</TabsTrigger>
-              <TabsTrigger value="job-matching">Job Matching</TabsTrigger>
-              <TabsTrigger value="ai-enhancement">AI Enhancement</TabsTrigger>
-              <TabsTrigger value="cover-letter">Cover Letter</TabsTrigger>
-            </TabsList>
-            <TabsContent value="analysis">
-              <AnalysisDashboard 
-                isAnalyzing={isAnalyzing}
-                result={analysisResult}
-              />
-            </TabsContent>
-            <TabsContent value="job-matching">
-              <JobMatching 
-                result={analysisResult}
-                jobDescription={jobDescription}
-              />
-            </TabsContent>
-            <TabsContent value="ai-enhancement">
-              <AiEnhancement 
-                result={analysisResult}
-                onEnhance={handleAnalysis}
-              />
-            </TabsContent>
-            <TabsContent value="cover-letter">
-              <CoverLetterGenerator 
-                resumeData={file}
-                jobDescription={jobDescription}
-                aiModel={genAI.current}
-              />
-            </TabsContent>
-            
-          </Tabs>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <UploadSection 
+              onFileUpload={handleFileUpload}
+              onJobDescriptionChange={handleJobDescriptionChange}
+              onAnalyze={handleAnalysis}
+              isAnalyzing={isAnalyzing}
+              errorMessage={errorMessage}
+            />
+          </div>
+
+          <div className="lg:col-span-2">
+            <Tabs defaultValue="analysis" className="w-full">
+              <TabsList className="grid grid-cols-4 w-full">
+                <TabsTrigger value="analysis">Analysis</TabsTrigger>
+                <TabsTrigger value="job-matching">Job Matching</TabsTrigger>
+                <TabsTrigger value="ai-enhancement">AI Enhancement</TabsTrigger>
+                <TabsTrigger value="cover-letter">Cover Letter</TabsTrigger>
+              </TabsList>
+              <TabsContent value="analysis">
+                <AnalysisDashboard 
+                  isAnalyzing={isAnalyzing}
+                  result={analysisResult}
+                />
+              </TabsContent>
+              <TabsContent value="job-matching">
+                <JobMatching 
+                  result={analysisResult}
+                  jobDescription={jobDescription}
+                />
+              </TabsContent>
+              <TabsContent value="ai-enhancement">
+                <AiEnhancement 
+                  result={analysisResult}
+                  onEnhance={handleAnalysis}
+                />
+              </TabsContent>
+              <TabsContent value="cover-letter">
+                <CoverLetterGenerator 
+                  resumeData={file}
+                  jobDescription={jobDescription}
+                  aiModel={genAI.current}
+                />
+              </TabsContent>
+              
+            </Tabs>
+          </div>
         </div>
       </div>
+      <Footer  />
     </main>
   )
 }
