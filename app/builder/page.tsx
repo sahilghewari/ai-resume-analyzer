@@ -35,6 +35,11 @@ import { templates } from "@/components/templates"
 import { TemplateCard } from "@/components/templates/template-card"
 import { TemplateRenderer } from "@/components/templates/template-renderer"
 
+import Link from "next/link"
+import { useSearchParams } from 'next/navigation'
+
+import { generatePDF } from "@/lib/pdfGenerator";
+
 interface ResumeData {
   personalInfo: {
     name: string
@@ -74,6 +79,9 @@ interface ResumeData {
 }
 
 export default function ResumeBuilder() {
+  const searchParams = useSearchParams()
+  const resumeId = searchParams.get('resumeId')
+
   const [activeTemplate, setActiveTemplate] = useState("modern")
   const [previewMode, setPreviewMode] = useState(false)
   const [resumeData, setResumeData] = useState(emptyResumeData)
@@ -90,16 +98,23 @@ export default function ResumeBuilder() {
   
   // Initialize or load saved resume
   useEffect(() => {
-    const saved = getCurrentResume()
-    if (saved) {
-      setCurrentResumeState(saved)
-      setResumeData(saved.data)
-      setActiveTemplate(saved.templateId)
+    const currentResume = getCurrentResume();
+    if (currentResume && currentResume.data) {
+      setCurrentResumeState(currentResume);
+      setResumeData(currentResume.data);
+      setActiveTemplate(currentResume.templateId);
     } else {
-      // If no saved resume, start with empty state
-      setResumeData(emptyResumeData)
+      const newResume = createNewResume();
+      setCurrentResumeState(newResume);
+      setResumeData(emptyResumeData);
+      setActiveTemplate('modern');
+      // Save initial state
+      saveResume({
+        ...newResume,
+        data: emptyResumeData
+      });
     }
-  }, [])
+  }, []); // Remove resumeId from dependencies if not needed
 
   // Auto-save functionality
   const autoSave = getAutoSaveDebounce(() => {
@@ -109,14 +124,9 @@ export default function ResumeBuilder() {
       data: resumeData,
       templateId: activeTemplate
     }
-    saveResume(updatedResume)
-    setCurrentResume(updatedResume)
-    toast({
-      title: "Progress saved",
-      description: "Your resume has been automatically saved",
-      duration: 2000
-    })
-  })
+    const saved = saveResume(updatedResume);
+    setCurrentResumeState(saved);
+  });
 
   // Update auto-save when data changes
   useEffect(() => {
@@ -124,32 +134,72 @@ export default function ResumeBuilder() {
   }, [resumeData, activeTemplate])
 
   const handleSaveResume = () => {
-    const updatedResume = {
-      ...currentResume,
-      lastModified: Date.now(),
-      data: resumeData,
-      templateId: activeTemplate
+    // Validate required fields
+    if (!resumeData.personalInfo.name?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your name before saving",
+        variant: "destructive"
+      });
+      return;
     }
-    saveResume(updatedResume)
-    setCurrentResume(updatedResume)
-    toast({
-      title: "Resume saved",
-      description: "Your resume has been saved successfully",
-      duration: 3000
-    })
-  }
+
+    try {
+      const resumeToSave: SavedResume = {
+        ...currentResume,
+        name: resumeData.personalInfo.name || 'Untitled Resume',
+        lastModified: Date.now(),
+        data: resumeData,
+        templateId: activeTemplate,
+        createdAt: currentResume.createdAt || Date.now()
+      };
+      
+      const savedResume = saveResume(resumeToSave);
+      setCurrentResumeState(savedResume);
+      
+      // Show success toast with link
+      toast({
+        title: "Resume saved successfully!",
+        description: (
+          <div className="flex flex-col gap-2">
+            <p>Your resume has been saved to your collection.</p>
+            <Link href="/resumes" className="text-brand-600 hover:underline">
+              View all resumes →
+            </Link>
+          </div>
+        ),
+        duration: 5000
+      });
+
+      // Optional: Show save indicator
+      const saveIndicator = document.createElement('div');
+      saveIndicator.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-full shadow-lg';
+      saveIndicator.textContent = 'Saved ✓';
+      document.body.appendChild(saveIndicator);
+      setTimeout(() => saveIndicator.remove(), 2000);
+
+    } catch (error) {
+      console.error('Error saving resume:', error);
+      toast({
+        title: "Error saving resume",
+        description: "There was a problem saving your resume. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const createNewResumeHandler = () => {
-    const newResume = createNewResume()
-    setCurrentResumeState(newResume)
-    setResumeData(emptyResumeData)
-    setActiveTemplate('modern')
+    const newResume = createNewResume();
+    setCurrentResumeState(newResume);
+    setResumeData(emptyResumeData);
+    setActiveTemplate('modern');
+    setCurrentResume(newResume); // Set as current resume immediately
     toast({
       title: "New resume created",
       description: "Started a new resume",
       duration: 3000
-    })
-  }
+    });
+  };
 
   const handlePersonalInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -287,9 +337,24 @@ export default function ResumeBuilder() {
     setPreviewMode(!previewMode)
   }
 
-  const downloadResume = () => {
-    // In a real implementation, this would generate a PDF
-    alert("Resume download functionality would be implemented here")
+  const downloadResume = async () => {
+    try {
+      const fileName = `${resumeData.personalInfo.name || 'resume'}_${new Date().toLocaleDateString()}.pdf`;
+      await generatePDF('resume-preview', fileName);
+      
+      toast({
+        title: "Resume Downloaded!",
+        description: "Your resume has been downloaded as a PDF.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast({
+        title: "Download failed",
+        description: "There was an error generating your PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
   }
 
   // Add this function to handle applying AI suggestions
@@ -752,12 +817,15 @@ export default function ResumeBuilder() {
             <div className={previewMode ? "col-span-2" : ""}>
               <Card className="bg-white shadow-md">
                 <CardContent className="p-8">
-                  <TemplateRenderer template={activeTemplate} data={resumeData} />
+                  <div id="resume-preview">
+                    <TemplateRenderer template={activeTemplate} data={resumeData} />
+                  </div>
                 </CardContent>
               </Card>
             </div>
           </div>
         </div>
+      
       </main>
 
       <Footer />

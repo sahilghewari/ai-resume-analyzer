@@ -58,6 +58,7 @@ export default function Navbar() {
               >
                 Home
               </Link>
+              
               <Link
                 href="/ai-analyzer"
                 className="text-muted-foreground hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
@@ -112,6 +113,7 @@ export default function Navbar() {
               >
                 Home
               </Link>
+              
               <Link
                 href="/analyzer"
                 className="block text-muted-foreground hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
