@@ -25,6 +25,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/analyzer/page.js"
+    ],
+    "/api/enhance-resume/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/enhance-resume/route.js"
     ]
   }
 }

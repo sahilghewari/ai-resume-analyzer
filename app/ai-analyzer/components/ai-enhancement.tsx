@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -10,7 +11,25 @@ import { Badge } from "@/components/ui/badge"
 import { motion, AnimatePresence } from "framer-motion"
 import { MessageSquare, Send, RefreshCw, ThumbsUp, ThumbsDown, Copy, Wand2 } from "lucide-react"
 
-export default function AiEnhancement() {
+interface AiEnhancementProps {
+  result: any;
+  onEnhance: () => void;
+}
+
+interface EnhanceResponse {
+  content?: string;
+  success: boolean;
+  error?: string;
+}
+
+interface FormattedMessage {
+  title?: string;
+  content: string[];
+  type?: 'tip' | 'suggestion' | 'improvement';
+}
+
+export default function AiEnhancement({ result, onEnhance }: AiEnhancementProps) {
+  const genAI = useRef(new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!));
   const [activeTab, setActiveTab] = useState("experience")
   const [isGenerating, setIsGenerating] = useState(false)
   const [originalText, setOriginalText] = useState({
@@ -33,49 +52,193 @@ export default function AiEnhancement() {
   ])
   const [newMessage, setNewMessage] = useState("")
 
-  const handleGenerate = () => {
-    setIsGenerating(true)
+  const formatEnhancedContent = (content: string, section: string) => {
+    // Remove any markdown or special characters
+    let formatted = content.replace(/[*#`]/g, '').trim();
+    
+    switch (section) {
+      case 'experience':
+        // Split and format bullet points
+        formatted = formatted
+          .split(/\n|•/)
+          .filter(line => line.trim())
+          .map(line => `• ${line.trim()}`)
+          .join('\n');
+        break;
+      case 'skills':
+        // Format skills as comma-separated list
+        formatted = formatted
+          .split(/[,\n]/)
+          .map(skill => skill.trim())
+          .filter(Boolean)
+          .join(', ');
+        break;
+      case 'achievements':
+        // Format achievements as bullet points
+        formatted = formatted
+          .split(/\n|•/)
+          .filter(line => line.trim())
+          .map(line => `• ${line.trim()}`)
+          .join('\n');
+        break;
+    }
+    return formatted;
+  };
 
-    // Simulate AI generation
-    setTimeout(() => {
-      const enhanced = {
-        experience:
-          "Architected and developed responsive web applications using React.js and Redux, resulting in a 40% improvement in user engagement. Engineered reusable UI components that reduced development time by 30% and collaborated with cross-functional teams to resolve critical bugs, improving application stability by 25%.",
-        skills:
-          "React.js, JavaScript (ES6+), Redux, HTML5, CSS3/SASS, Responsive Design, Git, Jest/React Testing Library, RESTful APIs, Performance Optimization",
-        achievements:
-          "Spearheaded website performance optimization initiative that reduced load time by 65%, directly contributing to a 20% increase in user retention. Implemented comprehensive bug tracking and resolution system that decreased reported issues by 78% within three months.",
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const model = genAI.current.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `As a professional resume writer, enhance this ${activeTab} section to be more impactful and ATS-friendly.
+
+      Current content:
+      ${originalText[activeTab as keyof typeof originalText]}
+
+      Required improvements:
+      1. Use powerful action verbs at the start of each point
+      2. Include specific metrics and quantifiable achievements
+      3. Incorporate these keywords naturally: ${result?.keywords?.recommended.join(', ')}
+      4. Address these aspects: ${result?.improvements?.important.join('\n')}
+
+      Format requirements:
+      - For experience: Use clear bullet points starting with action verbs
+      - For skills: Provide as a comma-separated list
+      - For achievements: Use concise bullet points with metrics
+      - Do not include any markdown formatting or special characters
+      - Keep each bullet point to one line
+      - Focus on clarity and impact
+
+      Return only the enhanced content in plain text format.`;
+
+      const response = await model.generateContent(prompt);
+      const enhancedContent = response.response.text();
+      
+      // Format the enhanced content
+      const formattedContent = formatEnhancedContent(enhancedContent, activeTab);
+
+      setEnhancedText(prev => ({
+        ...prev,
+        [activeTab]: formattedContent
+      }));
+
+      // Update chat with formatted message
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Content enhanced with professional formatting and ATS optimization. Review the changes above.'
+      }]);
+
+    } catch (error) {
+      console.error('Enhancement failed:', error);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '❌ Sorry, I encountered an error. Please try again.'
+      }]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Update the suggestions based on AI analysis
+  const getSuggestions = () => {
+    if (!result) return [];
+    
+    return [
+      {
+        title: "Format Improvements",
+        content: result.format.improvements[0] || "No format suggestions available"
+      },
+      {
+        title: "Content Enhancement",
+        content: result.content.suggestions[0] || "No content suggestions available"
+      },
+      {
+        title: "Keyword Optimization",
+        content: `Add these keywords: ${result.keywords.recommended.join(', ')}`
+      },
+      {
+        title: "Critical Changes",
+        content: result.improvements.critical[0] || "No critical changes needed"
       }
+    ];
+  };
 
-      setEnhancedText({
-        ...enhancedText,
-        [activeTab]: enhanced[activeTab as keyof typeof enhanced],
-      })
+  // Update initial state based on result
+  useEffect(() => {
+    if (result) {
+      setOriginalText(prev => ({
+        ...prev,
+        skills: result.keywords.present.join(', '),
+        experience: result.content.strengths.join('\n'),
+        achievements: result.content.weaknesses.join('\n')
+      }));
+    }
+  }, [result]);
 
-      setIsGenerating(false)
-    }, 2000)
-  }
+  const formatChatMessage = (text: string): FormattedMessage => {
+    // Remove any markdown characters
+    const cleanText = text.replace(/[*#`]/g, '').trim();
+    
+    // Split into title and content if contains a title-like pattern
+    const titleMatch = cleanText.match(/^(.+?):\s*(.+)$/);
+    if (titleMatch) {
+      return {
+        title: titleMatch[1],
+        content: titleMatch[2].split('\n').map(line => line.trim()).filter(Boolean),
+        type: 'suggestion'
+      };
+    }
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return
+    // Split bullet points into array
+    const lines = cleanText.split(/\n|•/).map(line => line.trim()).filter(Boolean);
+    return { content: lines };
+  };
 
-    const updatedMessages = [...messages, { role: "user", content: newMessage }]
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
 
-    setMessages(updatedMessages)
-    setNewMessage("")
+    const userMessage = { role: "user", content: newMessage };
+    setMessages(prev => [...prev, userMessage]);
+    setNewMessage("");
 
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages([
-        ...updatedMessages,
-        {
-          role: "assistant",
-          content:
-            "I can help with that! To make your resume more impactful, try using strong action verbs, quantify your achievements with specific metrics, and tailor your content to match the job description. Would you like me to help rewrite a specific section of your resume?",
-        },
-      ])
-    }, 1000)
-  }
+    try {
+      const model = genAI.current.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `As a professional resume expert, provide structured advice.
+      
+      Previous conversation:
+      ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}
+      
+      User's question: ${newMessage}
+      
+      Respond with a structured message:
+      1. Start with a clear title followed by colon
+      2. Use bullet points for detailed advice
+      3. Keep each point concise and actionable
+      4. Group related suggestions together
+      5. Use professional language
+
+      Example format:
+      Improving Your Experience Section:
+      • Start each bullet with strong action verbs
+      • Include specific metrics and achievements
+      • Focus on relevant accomplishments
+
+      Return the response in plain text format.`;
+
+      const response = await model.generateContent(prompt);
+      const aiResponse = response.response.text();
+
+      setMessages(prev => [
+        ...prev,
+        { role: "assistant", content: aiResponse }
+      ]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "I apologize, but I encountered an error. Please try again."
+      }]);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -142,7 +305,7 @@ export default function AiEnhancement() {
                       <label className="text-sm font-medium">Enhanced Text</label>
                       <Badge variant="secondary">AI Enhanced</Badge>
                     </div>
-                    <div className="relative">
+                    <div className="relative ">
                       <Textarea
                         value={enhancedText[activeTab as keyof typeof enhancedText]}
                         onChange={(e) =>
@@ -151,7 +314,7 @@ export default function AiEnhancement() {
                             [activeTab]: e.target.value,
                           })
                         }
-                        className="min-h-[150px] pr-10"
+                        className="min-h-[250px] pr-10"
                       />
                       <Button
                         size="sm"
@@ -198,17 +361,37 @@ export default function AiEnhancement() {
         <CardContent>
           <div className="flex flex-col h-[400px]">
             <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-              {messages.map((message, index) => (
-                <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
-                      message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                    }`}
-                  >
-                    {message.content}
+              {messages.map((message, index) => {
+                if (message.role === "user") {
+                  return (
+                    <div key={index} className="flex justify-end">
+                      <div className="bg-primary text-primary-foreground rounded-lg p-3 max-w-[80%]">
+                        {message.content}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const formatted = formatChatMessage(message.content);
+                return (
+                  <div key={index} className="flex justify-start">
+                    <div className="bg-muted rounded-lg p-4 max-w-[80%] space-y-2">
+                      {formatted.title && (
+                        <h4 className="font-semibold text-primary">
+                          {formatted.title}
+                        </h4>
+                      )}
+                      <div className="space-y-2">
+                        {formatted.content.map((line, i) => (
+                          <p key={i} className="text-sm leading-relaxed">
+                            {line.startsWith('•') ? line : `• ${line}`}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex gap-2">
@@ -239,49 +422,15 @@ export default function AiEnhancement() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="rounded-lg border p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h3 className="font-medium">Use Action Verbs</h3>
+            {getSuggestions().map((suggestion, index) => (
+              <div key={index} className="rounded-lg border p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  <h3 className="font-medium">{suggestion.title}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">{suggestion.content}</p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Replace generic verbs like "worked on" with powerful action verbs like "spearheaded," "implemented," or
-                "orchestrated."
-              </p>
-            </div>
-
-            <div className="rounded-lg border p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h3 className="font-medium">Quantify Achievements</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Add specific metrics and percentages to demonstrate your impact, such as "increased sales by 25%" or
-                "reduced costs by $10,000."
-              </p>
-            </div>
-
-            <div className="rounded-lg border p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h3 className="font-medium">Tailor to Job Description</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Customize your resume for each application by incorporating keywords from the job description to improve
-                ATS compatibility.
-              </p>
-            </div>
-
-            <div className="rounded-lg border p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h3 className="font-medium">Focus on Results</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Emphasize outcomes rather than responsibilities. Show how your work contributed to company goals or
-                solved problems.
-              </p>
-            </div>
+            ))}
           </div>
         </CardContent>
       </Card>

@@ -8,7 +8,6 @@ import AnalysisDashboard from "@/app/ai-analyzer/components/analysis-dashboard"
 import JobMatching from "@/app/ai-analyzer/components/job-matching"
 import AiEnhancement from "@/app/ai-analyzer/components/ai-enhancement"
 import CoverLetterGenerator from "@/app/ai-analyzer/components/cover-letter-generator"
-import ResumePreview from "@/app/ai-analyzer/components/resume-preview"
 
 import { pdfjs } from 'react-pdf';
 
@@ -25,6 +24,36 @@ type AnalysisResult = {
   improvements: { critical: string[]; important: string[]; optional: string[] };
 }
 
+interface ParsedResumeData {
+  basicInfo: {
+    name: string;
+    email: string;
+    phone: string;
+    title?: string;
+    linkedin?: string;
+  };
+  summary?: string;
+  experience: Array<{
+    company: string;
+    title: string;
+    duration: string;
+    highlights: string[];
+  }>;
+  education: Array<{
+    school: string;
+    degree: string;
+    duration: string;
+    details?: string[];
+  }>;
+  skills: string[];
+  projects?: Array<{
+    name: string;
+    description: string;
+    technologies: string[];
+    url?: string;
+  }>;
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>("");
@@ -32,6 +61,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [parsedResumeData, setParsedResumeData] = useState<ParsedResumeData | null>(null);
   const genAI = useRef(new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!));
 
   // Handle file upload and read content
@@ -39,6 +69,7 @@ export default function Home() {
     if (!uploadedFile || !content) {
       setFile(null);
       setFileContent('');
+      setParsedResumeData(null);
       return;
     }
 
@@ -46,9 +77,12 @@ export default function Home() {
       setFile(uploadedFile);
       setFileContent(content);
       console.log('File content loaded:', content.substring(0, 100) + '...');
+      const parsedData = await parseResume(uploadedFile); // Implement PDF parsing
+      setParsedResumeData(parsedData);
     } catch (error) {
       console.error('File processing error:', error);
       setErrorMessage('Failed to process file');
+      setParsedResumeData(null);
     }
   };
 
@@ -80,6 +114,50 @@ export default function Home() {
         reader.readAsText(file);
       });
     }
+  };
+
+  const parseResume = async (file: File): Promise<ParsedResumeData> => {
+    const content = await readFileContent(file);
+    
+    // Use Gemini to parse and structure the resume content
+    const model = genAI.current.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `Parse this resume content into a structured format:
+    ${content}
+
+    Return a JSON object that matches this structure:
+    {
+      "basicInfo": {
+        "name": "extracted name",
+        "email": "extracted email",
+        "phone": "extracted phone",
+        "title": "extracted job title",
+        "linkedin": "extracted linkedin (if present)"
+      },
+      "summary": "extracted summary",
+      "experience": [{
+        "company": "company name",
+        "title": "job title",
+        "duration": "time period",
+        "highlights": ["achievement 1", "achievement 2"]
+      }],
+      "education": [{
+        "school": "institution name",
+        "degree": "degree name",
+        "duration": "time period",
+        "details": ["relevant detail 1", "relevant detail 2"]
+      }],
+      "skills": ["skill 1", "skill 2"],
+      "projects": [{
+        "name": "project name",
+        "description": "project description",
+        "technologies": ["tech 1", "tech 2"],
+        "url": "project url (if present)"
+      }]
+    }`;
+
+    const response = await model.generateContent(prompt);
+    const parsed = cleanAndParseJSON(response.response.text());
+    return parsed;
   };
 
   const handleJobDescriptionChange = (description: string) => {
@@ -225,7 +303,6 @@ export default function Home() {
               <TabsTrigger value="job-matching">Job Matching</TabsTrigger>
               <TabsTrigger value="ai-enhancement">AI Enhancement</TabsTrigger>
               <TabsTrigger value="cover-letter">Cover Letter</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
             </TabsList>
             <TabsContent value="analysis">
               <AnalysisDashboard 
@@ -252,9 +329,7 @@ export default function Home() {
                 aiModel={genAI.current}
               />
             </TabsContent>
-            <TabsContent value="preview">
-              <ResumePreview file={file} />
-            </TabsContent>
+            
           </Tabs>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,8 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Download, Copy, RefreshCw, Sparkles, CheckCircle } from "lucide-react"
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { toast } from "sonner";
 
-export default function CoverLetterGenerator() {
+interface CoverLetterGeneratorProps {
+  resumeData?: any;
+  jobDescription?: string;
+}
+
+export default function CoverLetterGenerator({ resumeData, jobDescription }: CoverLetterGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGenerated, setIsGenerated] = useState(false)
   const [coverLetter, setCoverLetter] = useState("")
@@ -24,6 +31,9 @@ export default function CoverLetterGenerator() {
     tone: "professional",
     includePersonal: true,
   })
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const genAI = useRef(new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!));
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -47,35 +57,96 @@ export default function CoverLetterGenerator() {
     })
   }
 
-  const handleGenerate = () => {
-    setIsGenerating(true)
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const model = genAI.current.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `Create a professional cover letter with the following details:
 
-    // Simulate AI generation
-    setTimeout(() => {
-      const generatedLetter = `Dear Hiring Manager,
+      Company: ${formData.company}
+      Position: ${formData.position}
+      Job Description: ${formData.jobDescription}
+      Tone: ${formData.tone}
+      Include Personal Touch: ${formData.includePersonal}
+      
+      Resume Data: ${JSON.stringify(resumeData)}
 
-I am writing to express my strong interest in the ${formData.position} position at ${formData.company}. With over 7 years of experience in frontend development and a passion for creating exceptional user experiences, I am excited about the opportunity to contribute to your innovative team.
+      Requirements:
+      1. Use a ${formData.tone} tone
+      2. Match skills from resume to job requirements
+      3. Include specific achievements from resume
+      4. ${formData.includePersonal ? 'Add personal connection to company' : 'Keep strictly professional'}
+      5. Keep under 400 words
+      6. Use proper business letter format
+      
+      Return only the cover letter text, no additional formatting.`;
 
-Throughout my career, I have successfully delivered responsive web applications using modern technologies like React.js, Redux, and TypeScript. My experience aligns perfectly with the requirements outlined in your job description, particularly in developing scalable frontend architectures and optimizing application performance.
+      const result = await model.generateContent(prompt);
+      const letter = result.response.text();
+      setCoverLetter(letter);
+      setIsGenerated(true);
+      toast.success("Cover letter generated successfully!");
+    } catch (error) {
+      console.error('Generation failed:', error);
+      toast.error("Failed to generate cover letter. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
-In my current role at TechCorp, I spearheaded a website performance optimization initiative that reduced load time by 65%, directly contributing to a 20% increase in user retention. I also implemented a comprehensive bug tracking and resolution system that decreased reported issues by 78% within three months.
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(coverLetter);
+      setIsCopied(true);
+      toast.success("Copied to clipboard!");
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      toast.error("Failed to copy text. Please try again.");
+    }
+  };
 
-I am particularly drawn to ${formData.company}'s commitment to innovation and user-centered design. Your recent project on AI-powered user interfaces particularly resonates with my professional interests and expertise.
+  const handleDownload = () => {
+    try {
+      const blob = new Blob([coverLetter], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Cover_Letter_${formData.company.replace(/\s+/g, '_')}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Cover letter downloaded!");
+    } catch (error) {
+      toast.error("Download failed. Please try again.");
+    }
+  };
 
-I would welcome the opportunity to discuss how my skills and experience can benefit your team. Thank you for considering my application.
+  const handleSaveToResume = async () => {
+    setIsSaving(true);
+    try {
+      // Here you would typically save to your database
+      // For now, we'll just simulate the save
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.success("Cover letter saved to resume!");
+    } catch (error) {
+      toast.error("Failed to save cover letter.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-Sincerely,
-Your Name`
-
-      setCoverLetter(generatedLetter)
-      setIsGenerating(false)
-      setIsGenerated(true)
-    }, 3000)
-  }
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(coverLetter)
-  }
+  const handleStartOver = () => {
+    setIsGenerated(false);
+    setCoverLetter("");
+    setFormData({
+      company: "",
+      position: "",
+      jobDescription: "",
+      tone: "professional",
+      includePersonal: true,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -157,7 +228,7 @@ Your Name`
                 {isGenerating ? (
                   <span className="flex items-center gap-2">
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    Generating Cover Letter...
+                    Generating...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
@@ -181,11 +252,24 @@ Your Name`
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handleCopy}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleCopy}
+                    disabled={isCopied}
+                  >
+                    {isCopied ? (
+                      <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="mr-2 h-4 w-4" />
+                    )}
+                    {isCopied ? "Copied!" : "Copy"}
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleDownload}
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </Button>
@@ -215,13 +299,20 @@ Your Name`
           </Card>
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setIsGenerated(false)}>
+            <Button variant="outline" onClick={handleStartOver}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Start Over
             </Button>
-            <Button>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Save to Resume
+            <Button 
+              onClick={handleSaveToResume}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="mr-2 h-4 w-4" />
+              )}
+              {isSaving ? "Saving..." : "Save to Resume"}
             </Button>
           </div>
         </>

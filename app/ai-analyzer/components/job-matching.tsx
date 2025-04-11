@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Search, Briefcase, CheckCircle, AlertCircle, ChevronRight } from "lucide-react"
 import {
   PieChart,
@@ -20,6 +20,7 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts"
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 interface AnalysisResult {
   atsScore: number;
@@ -39,8 +40,8 @@ interface AnalysisResult {
     critical: string[];
     important: string[];
   };
-  requirements: {
-    items: Array<{
+  requirements?: {
+    items?: Array<{
       requirement: string;
       satisfied: boolean;
       score: number;
@@ -54,7 +55,10 @@ interface JobMatchingProps {
   jobDescription: string;
 }
 
-export default function JobMatching({ result, jobDescription }: JobMatchingProps) {
+
+
+export default function JobMatching({ result, jobDescription, onOptimize }: JobMatchingProps) {
+  const genAI = useRef(new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!));
   const [jobUrl, setJobUrl] = useState("")
   const [jobDescriptionInput, setJobDescriptionInput] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -101,10 +105,34 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
   const safeArray = (arr: string[] | undefined) => arr || [];
 
   // Add requirements handler
+  
   const getRequirementColor = (score: number) => {
     if (score >= 80) return "text-green-500";
     if (score >= 50) return "text-amber-500";
     return "text-red-500";
+  };
+
+  const cleanAndParseJSON = (text: string) => {
+    // Remove any markdown code block syntax and clean the text
+    const cleaned = text
+      .replace(/```json\s*|\s*```/g, '')  // Remove code blocks
+      .replace(/[\n\r]+/g, ' ')           // Replace newlines with spaces
+      .replace(/\s+/g, ' ')               // Normalize spaces
+      .trim();                            // Trim extra whitespace
+    
+    try {
+      return JSON.parse(cleaned);
+    } catch (e) {
+      console.error('JSON parse error:', e);
+      throw new Error('Failed to parse optimization result');
+    }
+  };
+
+  
+
+  // Add safe requirements helper
+  const getRequirements = () => {
+    return result?.requirements?.items || [];
   };
 
   if (!result?.content) {
@@ -272,28 +300,29 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {result.requirements?.items.map((item, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Briefcase className="h-5 w-5 text-primary" />
-                        <h3 className="font-medium">{item.requirement}</h3>
+                {getRequirements().length > 0 ? (
+                  getRequirements().map((item, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="h-5 w-5 text-primary" />
+                          <h3 className="font-medium">{item.requirement}</h3>
+                        </div>
+                        {item.satisfied ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <AlertCircle className={`h-5 w-5 ${getRequirementColor(item.score)}`} />
+                        )}
                       </div>
-                      {item.satisfied ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <AlertCircle className={`h-5 w-5 ${getRequirementColor(item.score)}`} />
-                      )}
+                      <Progress value={item.score} className="h-2" />
+                      <p className="text-sm text-muted-foreground">{item.feedback}</p>
                     </div>
-                    <Progress 
-                      value={item.score} 
-                      className="h-2" 
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      {item.feedback}
-                    </p>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No specific requirements to display
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
@@ -411,10 +440,7 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
 
           <div className="flex justify-between">
             <Button variant="outline">Try Another Job</Button>
-            <Button>
-              Optimize Resume
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
+            
           </div>
         </>
       )}
