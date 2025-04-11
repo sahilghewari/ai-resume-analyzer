@@ -8,6 +8,7 @@ import AnalysisDashboard from "@/app/ai-analyzer/components/analysis-dashboard"
 import JobMatching from "@/app/ai-analyzer/components/job-matching"
 import AiEnhancement from "@/app/ai-analyzer/components/ai-enhancement"
 import CoverLetterGenerator from "@/app/ai-analyzer/components/cover-letter-generator"
+import { Button } from "@/components/ui/button";
 
 import { pdfjs } from 'react-pdf';
 
@@ -298,7 +299,7 @@ export default function Home() {
 
         <div className="lg:col-span-2">
           <Tabs defaultValue="analysis" className="w-full">
-            <TabsList className="grid grid-cols-5 w-full">
+            <TabsList className="grid grid-cols-4 w-full">
               <TabsTrigger value="analysis">Analysis</TabsTrigger>
               <TabsTrigger value="job-matching">Job Matching</TabsTrigger>
               <TabsTrigger value="ai-enhancement">AI Enhancement</TabsTrigger>

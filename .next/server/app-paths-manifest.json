@@ -1,5 +1,4 @@
 {
-  "/ai-analyzer/page": "app/ai-analyzer/page.js",
-  "/analyzer/page": "app/analyzer/page.js",
-  "/page": "app/page.js"
+  "/page": "app/page.js",
+  "/ai-analyzer/page": "app/ai-analyzer/page.js"
 }
