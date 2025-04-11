@@ -413,7 +413,7 @@ export default function ResumeAnalyzer() {
                             </ul>
                           </div>
 
-                          <div className="p-4 border border-brand-200 bg-brand-50 dark:bg-brand-950/20 dark:border-brand-900 rounded-lg">
+                          <div className="p-4 border border-brand-200 bg-brand-50 dark:bg-brand-950/20 dark:bg-brand-900/20 dark:border-brand-900 rounded-lg">
                             <h3 className="text-lg font-medium text-brand-800 dark:text-brand-400 mb-2">
                               Medium Priority
                             </h3>
