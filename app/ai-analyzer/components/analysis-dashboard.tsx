@@ -8,37 +8,27 @@ import { CheckCircle2, XCircle, AlertCircle, Lightbulb, Award, Briefcase, Gradua
 import { motion } from "framer-motion"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
+interface AnalysisResult {
+  atsScore: number;
+  format: { score: number; feedback: string[]; improvements: string[] };
+  content: { score: number; strengths: string[]; weaknesses: string[]; suggestions: string[] };
+  keywords: { score: number; missing: string[]; present: string[]; recommended: string[] };
+  improvements: { critical: string[]; important: string[]; optional: string[] };
+}
+
 interface AnalysisDashboardProps {
   isAnalyzing: boolean;
   jobDescription?: string;
-  result: {
-    atsScore: number;
-    format: {
-      score: number;
-      feedback: string[];
-      improvements: string[];
-    };
-    content: {
-      score: number;
-      strengths: string[];
-      weaknesses: string[];
-      suggestions: string[];
-    };
-    keywords: {
-      score: number;
-      missing: string[];
-      present: string[];
-      recommended: string[];
-    };
-    improvements: {
-      critical: string[];
-      important: string[];
-      optional: string[];
-    };
-  } | null;
+  result: AnalysisResult | null;
 }
 
 export default function AnalysisDashboard({ isAnalyzing, jobDescription, result }: AnalysisDashboardProps) {
+  const safeScore = (score: number | undefined) => score ?? 0;
+  const safeArray = (arr: string[] | undefined) => arr || [];
+  const safeObject = <T extends object>(obj: T | undefined | null): T => (
+    obj || {} as T
+  );
+
   if (!result && !isAnalyzing) {
     return (
       <div className="text-center py-10 text-muted-foreground">
@@ -67,7 +57,25 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
     );
   }
 
-  const { atsScore, format, content, keywords } = result;
+  const {
+    atsScore = 0,
+    format = { score: 0, feedback: [], improvements: [] },
+    content = { 
+      score: 0, 
+      strengths: ['No strengths identified'], 
+      weaknesses: ['No weaknesses identified'], 
+      suggestions: ['No suggestions available'] 
+    },
+    keywords = { 
+      score: 0, 
+      missing: ['No missing keywords identified'], 
+      present: ['No matching keywords found'], 
+      recommended: ['No recommendations available'] 
+    }
+  } = result || {};
+
+  const hasKeywords = keywords.missing.length > 0 || keywords.present.length > 0;
+  const hasContent = content.strengths.length > 0 || content.weaknesses.length > 0;
 
   return (
     <div className="space-y-6">
@@ -95,25 +103,25 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
             <div className="relative pt-2">
               <div className="flex justify-between mb-1 text-sm">
                 <span>Score</span>
-                <span className="font-medium">{atsScore}%</span>
+                <span className="font-medium">{safeScore(atsScore)}%</span>
               </div>
               <div className="h-3 relative rounded-full overflow-hidden">
                 <div className="w-full h-full bg-primary/20 absolute"></div>
                 <motion.div
                   className="h-full bg-primary absolute"
                   initial={{ width: 0 }}
-                  animate={{ width: `${atsScore}%` }}
+                  animate={{ width: `${safeScore(atsScore)}%` }}
                   transition={{ duration: 1, ease: "easeOut" }}
                 ></motion.div>
               </div>
               <div className="mt-4 flex items-center text-sm">
-                {atsScore >= 70 ? (
+                {safeScore(atsScore) >= 70 ? (
                   <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
                 ) : (
                   <AlertCircle className="h-4 w-4 text-amber-500 mr-2" />
                 )}
                 <span>
-                  {atsScore >= 70 ? "Your resume is ATS-friendly" : "Needs improvement for ATS compatibility"}
+                  {safeScore(atsScore) >= 70 ? "Your resume is ATS-friendly" : "Needs improvement for ATS compatibility"}
                 </span>
               </div>
             </div>
@@ -129,14 +137,14 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
             <div className="relative pt-2">
               <div className="flex justify-between mb-1 text-sm">
                 <span>Match</span>
-                <span className="font-medium">{keywords.score}%</span>
+                <span className="font-medium">{safeScore(safeObject(keywords).score)}%</span>
               </div>
               <div className="h-3 relative rounded-full overflow-hidden">
                 <div className="w-full h-full bg-primary/20 absolute"></div>
                 <motion.div
                   className="h-full bg-primary absolute"
                   initial={{ width: 0 }}
-                  animate={{ width: `${keywords.score}%` }}
+                  animate={{ width: `${safeScore(safeObject(keywords).score)}%` }}
                   transition={{ duration: 1, ease: "easeOut" }}
                 ></motion.div>
               </div>
@@ -153,24 +161,24 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
             <div className="relative pt-2">
               <div className="flex justify-between mb-1 text-sm">
                 <span>Score</span>
-                <span className="font-medium">{format.score}%</span>
+                <span className="font-medium">{safeScore(format.score)}%</span>
               </div>
               <div className="h-3 relative rounded-full overflow-hidden">
                 <div className="w-full h-full bg-primary/20 absolute"></div>
                 <motion.div
                   className="h-full bg-primary absolute"
                   initial={{ width: 0 }}
-                  animate={{ width: `${format.score}%` }}
+                  animate={{ width: `${safeScore(format.score)}%` }}
                   transition={{ duration: 1, ease: "easeOut" }}
                 ></motion.div>
               </div>
               <div className="mt-4 flex items-center text-sm">
-                {format.score >= 70 ? (
+                {safeScore(format.score) >= 70 ? (
                   <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
                 ) : (
                   <AlertCircle className="h-4 w-4 text-amber-500 mr-2" />
                 )}
-                <span>{format.score >= 70 ? "Excellent formatting" : "Format needs improvement"}</span>
+                <span>{safeScore(format.score) >= 70 ? "Excellent formatting" : "Format needs improvement"}</span>
               </div>
             </div>
           </CardContent>
@@ -181,7 +189,9 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
         <Card>
           <CardHeader>
             <CardTitle>Detailed Analysis</CardTitle>
-            <CardDescription>Strengths, weaknesses, and suggestions</CardDescription>
+            <CardDescription>
+              {hasContent ? 'Strengths, weaknesses, and suggestions' : 'No detailed analysis available'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="strengths">
@@ -191,7 +201,7 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
                 <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
               </TabsList>
               <TabsContent value="strengths" className="space-y-4 pt-4">
-                {content.strengths.map((strength, index) => (
+                {safeArray(content.strengths).map((strength, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: 10 }}
@@ -205,7 +215,7 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
                 ))}
               </TabsContent>
               <TabsContent value="weaknesses" className="space-y-4 pt-4">
-                {content.weaknesses.map((weakness, index) => (
+                {safeArray(content.weaknesses).map((weakness, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: 10 }}
@@ -219,7 +229,7 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
                 ))}
               </TabsContent>
               <TabsContent value="suggestions" className="space-y-4 pt-4">
-                {content.suggestions.map((suggestion, index) => (
+                {safeArray(content.suggestions).map((suggestion, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: 10 }}
@@ -239,25 +249,36 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
         <Card>
           <CardHeader>
             <CardTitle>Missing Skills</CardTitle>
-            <CardDescription>Skills mentioned in the job description but missing from your resume</CardDescription>
+            <CardDescription>
+              {hasKeywords ? 
+                'Skills mentioned in the job description but missing from your resume' : 
+                'No missing skills identified'
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {keywords.missing.map((skill, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4 text-primary" />
-                    <span>{skill}</span>
-                  </div>
-                  <Badge variant="destructive">High Relevance</Badge>
-                </motion.div>
-              ))}
+              {keywords.missing.length > 0 ? (
+                keywords.missing.map((skill, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Code className="h-4 w-4 text-primary" />
+                      <span>{skill}</span>
+                    </div>
+                    <Badge variant="destructive">Missing</Badge>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="text-center text-muted-foreground py-4">
+                  No missing skills identified
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -270,13 +291,13 @@ export default function AnalysisDashboard({ isAnalyzing, jobDescription, result 
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {format.feedback.map((feedback, index) => (
+            {safeArray(format.feedback).map((feedback, index) => (
               <div key={index} className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5 text-primary" />
                   <h3 className="font-medium">{`Section ${index + 1}`}</h3>
                 </div>
-                <Progress value={format.score} className="h-2" />
+                <Progress value={safeScore(format.score)} className="h-2" />
                 <p className="text-sm text-muted-foreground">{feedback}</p>
               </div>
             ))}

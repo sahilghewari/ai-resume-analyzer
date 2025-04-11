@@ -31,114 +31,46 @@ export default function Home() {
   const [jobDescription, setJobDescription] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const genAI = useRef(new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!));
 
   // Handle file upload and read content
-  const handleFileUpload = async (uploadedFile: File) => {
-    setFile(uploadedFile);
-    try {
-      const content = await readFileContent(uploadedFile);
-      setFileContent(content);
-    } catch (error) {
-      console.error('Error reading file:', error);
+  const handleFileUpload = async (uploadedFile: File | null, content?: string) => {
+    if (!uploadedFile || !content) {
+      setFile(null);
+      setFileContent('');
+      return;
     }
-  };
 
-  const formatResumeText = (sections: { [key: string]: string[] }): string => {
-    const orderedSections = [
-      'header',
-      'summary',
-      'objective',
-      'experience',
-      'work_experience',
-      'professional_experience',
-      'education',
-      'skills',
-      'projects',
-      'certifications',
-      'awards',
-      'unclassified'
-    ];
-
-    return orderedSections
-      .filter(section => sections[section]?.length > 0)
-      .map(section => {
-        const content = sections[section]
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .replace(/[^\w\s.,;:-]/g, '') // Remove special characters except basic punctuation
-          .trim();
-
-        const sectionTitle = section.toUpperCase().replace(/_/g, ' ');
-        return `### ${sectionTitle} ###\n${content}\n`;
-      })
-      .join('\n\n');
+    try {
+      setFile(uploadedFile);
+      setFileContent(content);
+      console.log('File content loaded:', content.substring(0, 100) + '...');
+    } catch (error) {
+      console.error('File processing error:', error);
+      setErrorMessage('Failed to process file');
+    }
   };
 
   const readFileContent = async (file: File): Promise<string> => {
     if (file.type === 'application/pdf') {
       try {
         const arrayBuffer = await file.arrayBuffer();
-        const pdfDoc = await pdfjs.getDocument({
-          data: arrayBuffer,
-          useWorker: true,
-        }).promise;
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
 
-        let sections: { [key: string]: string[] } = {
-          header: [],
-          unclassified: []
-        };
-        let currentSection = 'unclassified';
-
-        for (let i = 1; i <= pdfDoc.numPages; i++) {
-          const page = await pdfDoc.getPage(i);
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
-          const items = textContent.items as { str: string; transform: number[]; }[];
-
-          let lastY = 0;
-          let lineBuffer: string[] = [];
-
-          // Group text by vertical position for better line detection
-          items.forEach((item, index) => {
-            const [, , , y] = item.transform;
-            const text = item.str.trim();
-
-            if (!text) return;
-
-            // New line detection
-            if (lastY && Math.abs(y - lastY) > 5) {
-              if (lineBuffer.length > 0) {
-                const line = lineBuffer.join(' ').trim();
-                if (line.length > 2) {
-                  // Detect section headers
-                  if (/^[A-Z\s]{3,}$/.test(line) || line.toUpperCase() === line) {
-                    currentSection = line.toLowerCase().replace(/\s+/g, '_');
-                    sections[currentSection] = sections[currentSection] || [];
-                  } else {
-                    sections[currentSection].push(line);
-                  }
-                }
-              }
-              lineBuffer = [];
-            }
-
-            lineBuffer.push(text);
-            lastY = y;
-          });
-
-          // Handle last line
-          if (lineBuffer.length > 0) {
-            sections[currentSection].push(lineBuffer.join(' ').trim());
-          }
+          const items = textContent.items as { str: string; }[];
+          
+          // Simple text extraction without section parsing
+          fullText += items.map(item => item.str).join(' ') + '\n';
         }
 
-        const formattedText = formatResumeText(sections);
-        console.log('Formatted resume text:', formattedText); // For debugging
-        return formattedText;
-
+        return fullText.trim();
       } catch (error) {
-        console.error('PDF parsing error:', error);
-        throw new Error('Unable to extract text from PDF. Please ensure it contains selectable text.');
+        throw new Error('Failed to extract text from PDF');
       }
     } else {
       return new Promise((resolve, reject) => {
@@ -150,100 +82,119 @@ export default function Home() {
     }
   };
 
+  const handleJobDescriptionChange = (description: string) => {
+    setJobDescription(description);
+    setErrorMessage('');
+  };
+
+  const cleanAndParseJSON = (text: string) => {
+    // Remove markdown code block syntax
+    let cleaned = text.replace(/```json\s*/, '').replace(/```\s*$/, '');
+    
+    // Fix common JSON issues
+    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1') // Remove trailing commas
+                    .replace(/\/\/[^\n]*/g, '') // Remove single-line comments
+                    .replace(/\/\*[\s\S]*?\*\//g, ''); // Remove multi-line comments
+    
+    try {
+      return JSON.parse(cleaned);
+    } catch (e) {
+      console.error('Initial parse failed, attempting to fix JSON:', e);
+      // If still fails, try more aggressive cleaning
+      cleaned = cleaned.replace(/[\n\r\t]/g, ' ') // Remove newlines and tabs
+                      .replace(/\s+/g, ' ') // Normalize spaces
+                      .replace(/"\s+}/g, '"}') // Fix spacing issues
+                      .replace(/"\s+]/g, '"]'); // Fix array spacing issues
+      return JSON.parse(cleaned);
+    }
+  };
+
   const handleAnalysis = async () => {
     if (!fileContent || !jobDescription) {
-      alert("Please provide both resume and job description");
+      setErrorMessage('Please provide both resume and job description');
       return;
     }
 
     setIsAnalyzing(true);
     try {
       const model = genAI.current.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const prompt = `As an ATS system expert, analyze this resume. The content is structured in sections.
-      Provide detailed feedback on formatting, content, and ATS compatibility.
-      
-      Job Description: ${jobDescription}
+      const prompt = `Analyze this resume against the job description. Focus on identifying specific strengths and requirements matching.
 
-      Resume Content (with sections):
+      RESUME:
       ${fileContent}
 
-      Return analysis in this exact JSON format:
+      JOB DESCRIPTION:
+      ${jobDescription}
+
+      Analyze and return JSON with focus on requirements matching:
       {
         "atsScore": <0-100>,
         "format": {
           "score": <0-100>,
-          "feedback": ["Analysis of each section's formatting", "Section organization feedback"],
-          "improvements": ["Section-specific formatting suggestions"]
+          "sections": {
+            "summary": {"present": boolean, "quality": <0-100>, "feedback": "specific feedback"},
+            "experience": {"present": boolean, "quality": <0-100>, "feedback": "specific feedback"},
+            "education": {"present": boolean, "quality": <0-100>, "feedback": "specific feedback"},
+            "skills": {"present": boolean, "quality": <0-100>, "feedback": "specific feedback"}
+          },
+          "feedback": ["overall format feedback"],
+          "improvements": ["format improvement suggestions"]
         },
         "content": {
           "score": <0-100>,
-          "strengths": ["Strong points in each section"],
-          "weaknesses": ["Areas needing improvement by section"],
-          "suggestions": ["Section-specific improvement suggestions"]
+          "strengths": ["specific strength with section reference"],
+          "weaknesses": ["specific weakness with section reference"],
+          "suggestions": ["actionable content suggestions"]
         },
         "keywords": {
           "score": <0-100>,
-          "missing": ["Keywords not found in any section"],
-          "present": ["Keywords found and their sections"],
-          "recommended": ["Suggested keywords for specific sections"]
+          "missing": ["missing required skills"],
+          "present": ["found matching skills"],
+          "recommended": ["recommended additions"]
         },
         "improvements": {
-          "critical": ["Highest priority section changes"],
-          "important": ["Important section enhancements"],
-          "optional": ["Optional section improvements"]
+          "critical": ["highest priority changes"],
+          "important": ["medium priority changes"],
+          "optional": ["nice-to-have changes"]
+        },
+        "requirements": {
+          "items": [
+            {
+              "requirement": "specific requirement from job description",
+              "satisfied": boolean,
+              "score": number 0-100,
+              "feedback": "detailed feedback about match"
+            }
+          ]
         }
       }`;
 
       const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text().trim();
+      const text = result.response.text();
       
       try {
-        // Clean and parse the response
-        const cleanJson = text.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        const cleanJson = text.replace(/```json\s*|\s*```/g, '').trim();
         const analysisData = JSON.parse(cleanJson);
         
-        // Ensure all arrays have content
-        const ensureArrayContent = (arr: string[]) => 
-          arr.length === 0 ? ["No specific items identified"] : arr;
-
-        // Add default message if analysis returns empty arrays
-        const processedData = {
+        // Transform data to include section analysis
+        const transformedData = {
           ...analysisData,
+          sections: analysisData.format.sections || {},
           format: {
             ...analysisData.format,
-            feedback: ensureArrayContent(analysisData.format.feedback),
-            improvements: ensureArrayContent(analysisData.format.improvements)
-          },
-          content: {
-            ...analysisData.content,
-            strengths: ensureArrayContent(analysisData.content.strengths),
-            weaknesses: ensureArrayContent(analysisData.content.weaknesses),
-            suggestions: ensureArrayContent(analysisData.content.suggestions)
-          },
-          keywords: {
-            ...analysisData.keywords,
-            missing: ensureArrayContent(analysisData.keywords.missing),
-            present: ensureArrayContent(analysisData.keywords.present),
-            recommended: ensureArrayContent(analysisData.keywords.recommended)
-          },
-          improvements: {
-            ...analysisData.improvements,
-            critical: ensureArrayContent(analysisData.improvements.critical),
-            important: ensureArrayContent(analysisData.improvements.important),
-            optional: ensureArrayContent(analysisData.improvements.optional)
+            score: analysisData.format.score || 0,
+            feedback: Array.isArray(analysisData.format.feedback) ? analysisData.format.feedback : [],
+            improvements: Array.isArray(analysisData.format.improvements) ? analysisData.format.improvements : []
           }
         };
-        
-        setAnalysisResult(processedData);
-      } catch (parseError) {
-        console.error('JSON Parse Error:', parseError);
-        console.log('Raw response:', text);
-        alert('Failed to parse analysis results. Please try again.');
+
+        setAnalysisResult(transformedData);
+      } catch (error) {
+        console.error('Analysis parsing failed:', error);
+        setErrorMessage('Failed to analyze resume. Please try again.');
       }
     } catch (error) {
-      console.error('Analysis failed:', error);
-      alert('Analysis failed. Please try again.');
+      setErrorMessage('Analysis failed. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -260,9 +211,10 @@ export default function Home() {
         <div className="lg:col-span-1">
           <UploadSection 
             onFileUpload={handleFileUpload}
-            onJobDescriptionChange={setJobDescription}
+            onJobDescriptionChange={handleJobDescriptionChange}
             onAnalyze={handleAnalysis}
             isAnalyzing={isAnalyzing}
+            errorMessage={errorMessage}
           />
         </div>
 

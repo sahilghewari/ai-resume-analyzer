@@ -21,8 +21,36 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
+interface AnalysisResult {
+  atsScore: number;
+  format: { score: number };
+  content: {
+    score: number;
+    strengths: string[];
+    weaknesses: string[];
+  };
+  keywords: {
+    score: number;
+    missing: string[];
+    present: string[];
+    recommended: string[];
+  };
+  improvements: {
+    critical: string[];
+    important: string[];
+  };
+  requirements: {
+    items: Array<{
+      requirement: string;
+      satisfied: boolean;
+      score: number;
+      feedback: string;
+    }>;
+  };
+}
+
 interface JobMatchingProps {
-  result: any;
+  result: AnalysisResult | null;
   jobDescription: string;
 }
 
@@ -41,28 +69,45 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
     }, 2000)
   }
 
-  // Mock data for the charts
-  const matchScore = 72
+  // Calculate overall match score from AI analysis
+  const getMatchScore = (result: AnalysisResult | null) => {
+    if (!result) return 0;
+    const scores = [
+      result.atsScore,
+      result.format.score,
+      result.content.score,
+      result.keywords.score
+    ];
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  };
 
-  const skillMatchData = [
-    { name: "Technical Skills", value: 85 },
-    { name: "Soft Skills", value: 65 },
-    { name: "Experience", value: 75 },
-    { name: "Education", value: 90 },
-    { name: "Certifications", value: 45 },
-  ]
+  // Generate radar chart data from AI analysis
+  const getSkillsData = (result: AnalysisResult | null) => {
+    if (!result) return [];
+    
+    return [
+      { subject: "ATS Score", A: result.atsScore, fullMark: 100 },
+      { subject: "Format", A: result.format.score, fullMark: 100 },
+      { subject: "Content", A: result.content.score, fullMark: 100 },
+      { subject: "Keywords", A: result.keywords.score, fullMark: 100 }
+    ];
+  };
 
-  const radarData = [
-    { subject: "Technical", A: 85, fullMark: 100 },
-    { subject: "Leadership", A: 60, fullMark: 100 },
-    { subject: "Communication", A: 75, fullMark: 100 },
-    { subject: "Experience", A: 70, fullMark: 100 },
-    { subject: "Education", A: 90, fullMark: 100 },
-  ]
+  // Replace mock data with real data
+  const matchScore = result ? getMatchScore(result) : 0;
+  const radarData = getSkillsData(result);
 
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"]
+  // Add safe access helper
+  const safeArray = (arr: string[] | undefined) => arr || [];
 
-  if (!result) {
+  // Add requirements handler
+  const getRequirementColor = (score: number) => {
+    if (score >= 80) return "text-green-500";
+    if (score >= 50) return "text-amber-500";
+    return "text-red-500";
+  };
+
+  if (!result?.content) {
     return (
       <div className="text-center py-10 text-muted-foreground">
         Complete the analysis to see job matching results
@@ -174,7 +219,7 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
                           endAngle={-270}
                           dataKey="value"
                         >
-                          <Cell fill="#0088FE" />
+                          <Cell fill={matchScore >= 70 ? "#22c55e" : matchScore >= 50 ? "#f59e0b" : "#ef4444"} />
                           <Cell fill="#EEEEEE" />
                         </Pie>
                       </PieChart>
@@ -206,7 +251,13 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
                       <PolarGrid />
                       <PolarAngleAxis dataKey="subject" />
                       <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                      <Radar name="Skills" dataKey="A" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      <Radar 
+                        name="Score" 
+                        dataKey="A" 
+                        stroke={matchScore >= 70 ? "#22c55e" : matchScore >= 50 ? "#f59e0b" : "#ef4444"}
+                        fill={matchScore >= 70 ? "#22c55e" : matchScore >= 50 ? "#f59e0b" : "#ef4444"}
+                        fillOpacity={0.6} 
+                      />
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>
@@ -221,59 +272,28 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                      <h3 className="font-medium">5+ years of frontend development</h3>
+                {result.requirements?.items.map((item, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">{item.requirement}</h3>
+                      </div>
+                      {item.satisfied ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <AlertCircle className={`h-5 w-5 ${getRequirementColor(item.score)}`} />
+                      )}
                     </div>
-                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <Progress 
+                      value={item.score} 
+                      className="h-2" 
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {item.feedback}
+                    </p>
                   </div>
-                  <Progress value={100} className="h-2" />
-                  <p className="text-sm text-muted-foreground">
-                    Your resume shows 7 years of frontend development experience.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                      <h3 className="font-medium">React.js experience</h3>
-                    </div>
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  </div>
-                  <Progress value={90} className="h-2" />
-                  <p className="text-sm text-muted-foreground">
-                    Your resume mentions React.js with 4 years of experience.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                      <h3 className="font-medium">TypeScript proficiency</h3>
-                    </div>
-                    <AlertCircle className="h-5 w-5 text-amber-500" />
-                  </div>
-                  <Progress value={50} className="h-2" />
-                  <p className="text-sm text-muted-foreground">
-                    TypeScript is mentioned but without details on proficiency level.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                      <h3 className="font-medium">Experience with GraphQL</h3>
-                    </div>
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                  </div>
-                  <Progress value={0} className="h-2" />
-                  <p className="text-sm text-muted-foreground">GraphQL is not mentioned in your resume.</p>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -287,7 +307,7 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
                 <div className="space-y-2">
                   <h3 className="font-medium">Matching Skills</h3>
                   <div className="flex flex-wrap gap-2">
-                    {result.content.strengths.map((skill: string, i: number) => (
+                    {safeArray(result.content.strengths).map((skill: string, i: number) => (
                       <span key={i} className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
                         {skill}
                       </span>
@@ -334,6 +354,57 @@ export default function JobMatching({ result, jobDescription }: JobMatchingProps
                     </ul>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Keyword Matches</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Missing Skills Section with Scrollbar */}
+                <div>
+                  <h3 className="font-medium mb-2">Missing Keywords</h3>
+                  <div className="max-h-[200px] overflow-y-auto border rounded-md p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {safeArray(result.keywords?.missing).map((keyword, i) => (
+                        <Badge key={i} variant="destructive" className="whitespace-nowrap">
+                          {keyword}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Present Keywords Section */}
+                <div>
+                  <h3 className="font-medium mb-2">Present Keywords</h3>
+                  <div className="max-h-[200px] overflow-y-auto border rounded-md p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {result.keywords.present.map((keyword, i) => (
+                        <Badge key={i} variant="success" className="whitespace-nowrap">
+                          {keyword}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recommended Keywords Section */}
+                <div>
+                  <h3 className="font-medium mb-2">Recommended Keywords</h3>
+                  <div className="max-h-[200px] overflow-y-auto border rounded-md p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {result.keywords.recommended.map((keyword, i) => (
+                        <Badge key={i} variant="outline" className="whitespace-nowrap">
+                          {keyword}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
