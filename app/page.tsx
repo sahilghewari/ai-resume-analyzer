@@ -20,7 +20,7 @@ export default function Home() {
       <main className="flex-grow">
         {/* Hero Section */}
         <section className="bg-gradient-to-b from-brand-50 to-white dark:from-navy-900 dark:to-navy-950 py-20 px-4 transition-theme">
-          <div className="container mx-auto max-w-6xl">
+          <div className="container mx-auto ">
             <div className="flex flex-col md:flex-row items-center gap-12">
               <div className="md:w-1/2 space-y-6">
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
@@ -48,53 +48,18 @@ export default function Home() {
                       Upload Resume
                     </Button>
                   </Link>
-                  <Button
-                    size="lg"
-                    variant="ghost"
-                    className="text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-navy-800 transition-colors"
-                  >
-                    Try Demo
-                  </Button>
                 </div>
               </div>
               {/* Replace the hero section image div with this animated version */}
               <div className="md:w-1/2">
                 <div className="relative">
-                  <motion.div
-                    className="absolute -inset-1 bg-gradient-to-r from-brand-400 to-aqua-400 dark:from-brand-600 dark:to-aqua-600 rounded-lg blur opacity-25"
-                    animate={{
-                      opacity: [0.2, 0.4, 0.2],
-                      scale: [0.98, 1.02, 0.98],
-                    }}
-                    transition={{
-                      duration: 4,
-                      repeat: Number.POSITIVE_INFINITY,
-                      repeatType: "loop",
-                    }}
-                  />
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                    className="relative"
-                  >
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{
-                        duration: 4,
-                        repeat: Number.POSITIVE_INFINITY,
-                        repeatType: "loop",
-                      }}
-                    >
-                      <div className="bg-card rounded-lg shadow-xl overflow-hidden">
+                      <div className="">
                         <img
-                          src="/placeholder.svg?height=400&width=500"
+                          src="https://i.postimg.cc/W34GrxtL/Screenshot-2025-04-12-at-8-09-42-AM.png"
                           alt="Resume Builder Preview"
-                          className="w-full h-auto"
+                          className="w-[37rem] h-[32rem] rounded-2xl border-2 border-brand-200 shadow-lg transition-transform transform hover:scale-105"
                         />
                       </div>
-                    </motion.div>
-                  </motion.div>
                 </div>
               </div>
             </div>
@@ -233,7 +198,7 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 px-4 bg-brand-600 dark:bg-brand-700 text-white transition-theme">
+        <section className="py-20 px-4 mt-10 bg-brand-600 dark:bg-brand-700 text-white transition-theme">
           <div className="container mx-auto max-w-6xl text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Supercharge Your Job Search?</h2>
             <div className="max-w-3xl mx-auto mb-8">
@@ -245,14 +210,14 @@ export default function Home() {
             </div>
             <div className="flex flex-wrap justify-center gap-4">
               <Link href="/builder">
-                <Button size="lg" className="bg-white text-brand-600 hover:bg-gray-100 transition-colors">
+                <Button size="lg" className="border border-white bg-transparent  text-white hover:bg-brand-600 transition-colors">
                   Get Started Now
                 </Button>
               </Link>
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white text-white hover:bg-brand-700 transition-colors"
+                className="border-white text-brand-600 bg-white hover:text-white hover:bg-brand-700 transition-colors"
               >
                 Learn More
               </Button>

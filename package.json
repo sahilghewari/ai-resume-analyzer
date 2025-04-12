@@ -47,6 +47,7 @@
     "embla-carousel-react": "8.5.1",
     "firebase": "^11.6.0",
     "framer-motion": "latest",
+    "gsap": "^3.12.7",
     "html2pdf.js": "^0.10.3",
     "input-otp": "1.4.1",
     "jspdf": "^3.0.1",

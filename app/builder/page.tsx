@@ -378,10 +378,10 @@ export default function ResumeBuilder() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-grow py-10 px-4 bg-gray-50">
+      <main className="flex-grow py-10 px-4 bg-gray-50 dark:bg-black">
         <div className="container mx-auto max-w-7xl">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Resume Builder</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-white">Resume Builder</h1>
             <div className="flex gap-3">
               <Button variant="outline" onClick={togglePreviewMode}>
                 {previewMode ? (
@@ -425,7 +425,7 @@ export default function ResumeBuilder() {
             {/* Editor Section */}
             {!previewMode && (
               <div className="space-y-6">
-                <Card>
+                <Card className="border border-white rounded-lg shadow-md">
                   <CardContent className="pt-6">
                     <Tabs defaultValue="personal">
                       <TabsList className="grid grid-cols-6 mb-6">
@@ -700,7 +700,7 @@ export default function ResumeBuilder() {
                             {resumeData.skills.map((skill, index) => (
                               <div
                                 key={index}
-                                className="flex items-center space-x-1 bg-gray-100 rounded-full px-3 py-1"
+                                className="flex items-center space-x-1 bg-[#1E293B] rounded-full px-3 py-1"
                               >
                                 <Input
                                   value={skill}
