@@ -48,13 +48,6 @@ export default function Home() {
                       Upload Resume
                     </Button>
                   </Link>
-                  <Button
-                    size="lg"
-                    variant="ghost"
-                    className="text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-navy-800 transition-colors"
-                  >
-                    Try Demo
-                  </Button>
                 </div>
               </div>
               {/* Replace the hero section image div with this animated version */}

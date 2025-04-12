@@ -304,7 +304,7 @@ export default function Home() {
   return (
     <main className="">
       <Navbar />
-      <div className="container mx-auto mt-6">
+      <div className="container mx-auto mb-8 mt-6">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold tracking-tight mb-2">Resume Analyzer</h1>
           <p className="text-muted-foreground">AI-powered resume analysis and enhancement</p>
