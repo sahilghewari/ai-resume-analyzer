@@ -12,12 +12,8 @@ import { Button } from "@/components/ui/button";
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import { saveAnalysis } from "@/lib/historyStorage"
-
-import { pdfjs } from 'react-pdf';
-
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.min.mjs';
-}
+import { extractTextFromPDF } from "@/lib/pdfParser"
+import { extractPDFText } from "@/lib/pdfUtils"
 
 // Analysis result type
 type AnalysisResult = {
@@ -70,53 +66,67 @@ export default function Home() {
 
   // Handle file upload and read content
   const handleFileUpload = async (uploadedFile: File | null, content?: string) => {
-    if (!uploadedFile || !content) {
-      setFile(null);
-      setFileContent('');
-      setParsedResumeData(null);
+    if (!uploadedFile) {
+      console.log('No file provided');
       return;
     }
 
     try {
       setFile(uploadedFile);
-      setFileContent(content);
-      console.log('File content loaded:', content.substring(0, 100) + '...');
-      const parsedData = await parseResume(uploadedFile); // Implement PDF parsing
+      console.log('Processing file:', uploadedFile.name);
+
+      if (uploadedFile.type === 'application/pdf') {
+        const pdfText = await extractPDFText(uploadedFile);
+        setFileContent(pdfText);
+        console.log('PDF processed successfully, content length:', pdfText.length);
+      } else {
+        setFileContent(content || '');
+      }
+
+      // Continue with resume parsing
+      const parsedData = await parseResume(uploadedFile);
       setParsedResumeData(parsedData);
+
     } catch (error) {
-      console.error('File processing error:', error);
-      setErrorMessage('Failed to process file');
-      setParsedResumeData(null);
+      console.error('File processing failed:', error);
+      setErrorMessage(
+        error.message.includes('scanned') 
+          ? 'Please upload a PDF with selectable text, not a scanned document.'
+          : 'Failed to process the PDF. Please try another file.'
+      );
+      setFile(null);
+      setFileContent('');
     }
   };
 
   const readFileContent = async (file: File): Promise<string> => {
-    if (file.type === 'application/pdf') {
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-        let fullText = '';
-
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const items = textContent.items as { str: string; }[];
-          
-          // Simple text extraction without section parsing
-          fullText += items.map(item => item.str).join(' ') + '\n';
-        }
-
-        return fullText.trim();
-      } catch (error) {
-        throw new Error('Failed to extract text from PDF');
+    console.log('Reading file:', file.name, file.type);
+    
+    try {
+      if (file.type === 'application/pdf') {
+        console.log('Processing PDF file');
+        const text = await extractPDFText(file);
+        console.log('PDF content extracted, length:', text.length);
+        return text;
+      } else {
+        console.log('Processing text file');
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            console.log('Text file content length:', content.length);
+            resolve(content);
+          };
+          reader.onerror = (e) => {
+            console.error('File read error:', e);
+            reject(new Error('Failed to read file'));
+          };
+          reader.readAsText(file);
+        });
       }
-    } else {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = (e) => reject(e);
-        reader.readAsText(file);
-      });
+    } catch (error) {
+      console.error('File reading error:', error);
+      throw new Error(`Failed to read file: ${error.message}`);
     }
   };
 
@@ -313,6 +323,8 @@ export default function Home() {
 
           <div className="lg:col-span-2">
             <Tabs defaultValue="analysis" className="w-full">
+
+            
               <TabsList className="grid grid-cols-4 w-full">
                 <TabsTrigger value="analysis">Analysis</TabsTrigger>
                 <TabsTrigger value="job-matching">Job Matching</TabsTrigger>

@@ -9,6 +9,8 @@ import { Upload, FileText, Check, AlertCircle } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { toast } from "@/components/ui/use-toast"
+import { extractTextFromPDF } from "@/lib/pdfParser"
 
 interface UploadSectionProps {
   onFileUpload: (file: File | null, content?: string) => void;  // Updated signature
@@ -88,33 +90,40 @@ export default function UploadSection({
     handleFileUpload(file);
   };
 
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = async (file: File) => {
     setFile(file);
     setUploadStatus('uploading');
     setValidationError(null);
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const content = e.target?.result as string;
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 5;
-        setUploadProgress(progress);
-        
-        if (progress >= 100) {
-          clearInterval(interval);
-          setUploadStatus('success');
-          onFileUpload(file, content);
-        }
-      }, 50);
-    };
-    
-    reader.onerror = () => {
-      setValidationError('Failed to read file');
+    try {
+      setUploadProgress(30);
+      const content = file.type === 'application/pdf' 
+        ? await extractTextFromPDF(file)
+        : await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+          });
+
+      if (!content || content.trim().length < 50) {
+        throw new Error('Could not extract meaningful text from file');
+      }
+
+      setUploadProgress(100);
+      setUploadStatus('success');
+      onFileUpload(file, content);
+
+    } catch (error) {
+      console.error('File processing error:', error);
+      setValidationError(error.message);
       setUploadStatus('error');
-    };
-    
-    reader.readAsText(file);
+      toast({
+        title: 'Error processing file',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
   };
 
   // Update job description handler
