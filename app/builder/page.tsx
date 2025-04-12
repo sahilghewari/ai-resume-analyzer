@@ -378,63 +378,72 @@ export default function ResumeBuilder() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-grow py-10 px-4 bg-gray-50">
-        <div className="container mx-auto max-w-7xl">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Resume Builder</h1>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={togglePreviewMode}>
+      <main className="flex-grow py-4 sm:py-6 lg:py-10 px-4 bg-gray-50">
+        <div className="container mx-auto max-w-[95%] xl:max-w-7xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800">Resume Builder</h1>
+            <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={togglePreviewMode}
+              >
                 {previewMode ? (
                   <>
                     <EyeOff className="mr-2 h-4 w-4" />
-                    Edit Mode
+                    <span className="hidden sm:inline">Edit Mode</span>
                   </>
                 ) : (
                   <>
                     <Eye className="mr-2 h-4 w-4" />
-                    Preview
+                    <span className="hidden sm:inline">Preview</span>
                   </>
                 )}
               </Button>
               <Button 
-                variant="outline" 
-                className="border-brand-600 text-brand-600 hover:bg-brand-50"
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none border-brand-600 text-brand-600 hover:bg-brand-50"
                 onClick={handleSaveResume}
               >
                 <Save className="mr-2 h-4 w-4" />
-                Save
+                <span className="hidden sm:inline">Save</span>
               </Button>
               <Button 
                 variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
                 onClick={createNewResumeHandler}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                New Resume
+                <span className="hidden sm:inline">New</span>
               </Button>
               <Button 
-                className="bg-brand-600 hover:bg-brand-700" 
+                size="sm"
+                className="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700" 
                 onClick={downloadResume}
               >
                 <Download className="mr-2 h-4 w-4" />
-                Download PDF
+                <span className="hidden sm:inline">Download</span>
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
             {/* Editor Section */}
             {!previewMode && (
-              <div className="space-y-6">
+              <div className="space-y-4 lg:space-y-6">
                 <Card>
-                  <CardContent className="pt-6">
+                  <CardContent className="p-4 sm:p-6">
                     <Tabs defaultValue="personal">
-                      <TabsList className="grid grid-cols-6 mb-6">
-                        <TabsTrigger value="personal">Personal</TabsTrigger>
-                        <TabsTrigger value="experience">Experience</TabsTrigger>
-                        <TabsTrigger value="education">Education</TabsTrigger>
-                        <TabsTrigger value="skills">Skills</TabsTrigger>
-                        <TabsTrigger value="projects">Projects</TabsTrigger>
-                        <TabsTrigger value="template">Template</TabsTrigger>
+                      <TabsList className="grid grid-cols-3 sm:grid-cols-6 gap-1 mb-4 sm:mb-6">
+                        <TabsTrigger value="personal" className="text-xs sm:text-sm">Personal</TabsTrigger>
+                        <TabsTrigger value="experience" className="text-xs sm:text-sm">Experience</TabsTrigger>
+                        <TabsTrigger value="education" className="text-xs sm:text-sm">Education</TabsTrigger>
+                        <TabsTrigger value="skills" className="text-xs sm:text-sm">Skills</TabsTrigger>
+                        <TabsTrigger value="projects" className="text-xs sm:text-sm">Projects</TabsTrigger>
+                        <TabsTrigger value="template" className="text-xs sm:text-sm">Template</TabsTrigger>
                       </TabsList>
 
                       {/* Replace the personal info tab content with our animated version */}
@@ -814,10 +823,10 @@ export default function ResumeBuilder() {
             )}
 
             {/* Preview Section */}
-            <div className={previewMode ? "col-span-2" : ""}>
-              <Card className="bg-white shadow-md">
-                <CardContent className="p-8">
-                  <div id="resume-preview">
+            <div className={`${previewMode ? "col-span-1 lg:col-span-2" : ""} min-h-[500px]`}>
+              <Card className="bg-white shadow-md overflow-hidden">
+                <CardContent className="p-4 sm:p-6 lg:p-8">
+                  <div id="resume-preview" className="max-w-[900px] mx-auto">
                     <TemplateRenderer template={activeTemplate} data={resumeData} />
                   </div>
                 </CardContent>
@@ -825,7 +834,6 @@ export default function ResumeBuilder() {
             </div>
           </div>
         </div>
-      
       </main>
 
       <Footer />
