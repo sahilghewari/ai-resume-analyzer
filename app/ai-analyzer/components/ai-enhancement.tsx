@@ -28,6 +28,11 @@ interface FormattedMessage {
   type?: 'tip' | 'suggestion' | 'improvement';
 }
 
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export default function AiEnhancement({ result, onEnhance }: AiEnhancementProps) {
   const genAI = useRef(new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!));
   const [activeTab, setActiveTab] = useState("experience")
@@ -43,7 +48,7 @@ export default function AiEnhancement({ result, onEnhance }: AiEnhancementProps)
     skills: "",
     achievements: "",
   })
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
@@ -196,7 +201,7 @@ export default function AiEnhancement({ result, onEnhance }: AiEnhancementProps)
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
-    const userMessage = { role: "user", content: newMessage };
+    const userMessage: Message = { role: "user", content: newMessage };
     setMessages(prev => [...prev, userMessage]);
     setNewMessage("");
 
