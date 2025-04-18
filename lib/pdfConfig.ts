@@ -1,5 +1,5 @@
-import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
+import { GlobalWorkerOptions } from 'pdfjs-dist';
 
 if (typeof window !== 'undefined') {
-  GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+  GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }

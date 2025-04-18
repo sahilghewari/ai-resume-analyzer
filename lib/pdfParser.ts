@@ -1,4 +1,5 @@
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf';
+import { getDocument } from 'pdfjs-dist';
+import './pdfConfig';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined') {

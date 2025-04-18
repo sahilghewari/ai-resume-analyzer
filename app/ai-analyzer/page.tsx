@@ -54,6 +54,13 @@ interface ParsedResumeData {
   }>;
 }
 
+type MessageRole = "user" | "assistant";
+
+interface ChatMessage {
+  role: MessageRole;
+  content: string;
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>("");
@@ -62,6 +69,8 @@ export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [parsedResumeData, setParsedResumeData] = useState<ParsedResumeData | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
   const genAI = useRef(new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!));
 
   // Handle file upload and read content
@@ -298,6 +307,29 @@ export default function Home() {
       setErrorMessage('Analysis failed. Please try again.');
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
+
+    const userMessage: ChatMessage = { 
+      role: "user", 
+      content: newMessage 
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setNewMessage("");
+
+    try {
+      // When adding assistant message
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: response // your response from AI
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error:", error);
     }
   };
 

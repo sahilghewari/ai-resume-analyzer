@@ -1,4 +1,4 @@
-import { getDocument, PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf';
+import { getDocument, PDFDocumentProxy } from 'pdfjs-dist';
 import './pdfConfig';
 
 export async function extractPDFText(file: File): Promise<string> {
