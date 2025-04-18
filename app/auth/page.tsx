@@ -62,7 +62,6 @@ export default function AuthPage() {
                       label="Email"
                       type="email"
                       placeholder="your.email@example.com"
-                      required
                     />
                     <div className="space-y-2">
                       <Label htmlFor="password">Password</Label>

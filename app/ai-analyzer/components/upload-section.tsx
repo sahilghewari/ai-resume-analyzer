@@ -116,11 +116,13 @@ export default function UploadSection({
 
     } catch (error) {
       console.error('File processing error:', error);
-      setValidationError(error.message);
+      setValidationError(
+        error instanceof Error ? error.message : String(error)
+      );
       setUploadStatus('error');
       toast({
         title: 'Error processing file',
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive'
       });
     }

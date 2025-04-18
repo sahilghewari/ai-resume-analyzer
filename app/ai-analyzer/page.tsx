@@ -99,7 +99,7 @@ export default function Home() {
     } catch (error) {
       console.error('File processing failed:', error);
       setErrorMessage(
-        error.message.includes('scanned') 
+        error instanceof Error && error.message.includes('scanned')
           ? 'Please upload a PDF with selectable text, not a scanned document.'
           : 'Failed to process the PDF. Please try another file.'
       );
@@ -135,7 +135,11 @@ export default function Home() {
       }
     } catch (error) {
       console.error('File reading error:', error);
-      throw new Error(`Failed to read file: ${error.message}`);
+      throw new Error(
+        `Failed to read file: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   };
 
@@ -322,10 +326,22 @@ export default function Home() {
     setNewMessage("");
 
     try {
-      // When adding assistant message
+      // Generate assistant response using Gemini
+      const model = genAI.current.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `
+      Previous conversation:
+      ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}
+      
+      User's question: ${newMessage}
+      
+      Respond as a professional resume assistant with clear, actionable advice.
+      `;
+      const result = await model.generateContent(prompt);
+      const aiResponse = result.response.text();
+
       const assistantMessage: ChatMessage = {
         role: "assistant",
-        content: response // your response from AI
+        content: aiResponse
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
@@ -373,6 +389,7 @@ export default function Home() {
                 <JobMatching 
                   result={analysisResult}
                   jobDescription={jobDescription}
+                  onOptimize={() => {}} // Provide a no-op or actual handler as needed
                 />
               </TabsContent>
               <TabsContent value="ai-enhancement">
@@ -385,7 +402,6 @@ export default function Home() {
                 <CoverLetterGenerator 
                   resumeData={file}
                   jobDescription={jobDescription}
-                  aiModel={genAI.current}
                 />
               </TabsContent>
               
