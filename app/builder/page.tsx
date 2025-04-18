@@ -84,7 +84,7 @@ export default function ResumeBuilder() {
 
   const [activeTemplate, setActiveTemplate] = useState("modern")
   const [previewMode, setPreviewMode] = useState(false)
-  const [resumeData, setResumeData] = useState(emptyResumeData)
+  const [resumeData, setResumeData] = useState<ResumeData>(emptyResumeData)
   const [aiSuggestions, setAiSuggestions] = useState<
     Array<{
       id: string
@@ -220,13 +220,16 @@ export default function ResumeBuilder() {
     })
   }
 
+  // Ensure resumeData.skills is typed as string[] in your resumeData type/interface:
+  // interface ResumeData { ...; skills: string[]; ... }
+
   const handleSkillChange = (index: number, value: string) => {
-    const updatedSkills = [...resumeData.skills]
-    updatedSkills[index] = value
+    const updatedSkills = [...resumeData.skills];
+    updatedSkills[index] = value;
     setResumeData({
       ...resumeData,
       skills: updatedSkills,
-    })
+    });
   }
 
   const addSkill = () => {
