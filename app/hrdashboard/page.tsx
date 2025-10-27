@@ -136,12 +136,15 @@ export default function HRDashboard() {
       }
     } finally {
       setIsAnalyzing(false)
-      setAnalysisProgress(abortControllerRef.current?.signal.aborted ? 0 : 100)
+      setAnalysisProgress(isCancelled ? 0 : 100)
       setCurrentFile("")
+
+      // Store abort status before clearing the controller
+      const wasAborted = abortControllerRef.current?.signal.aborted || false
       abortControllerRef.current = null
 
       // Show completion message only if not cancelled
-      if (!abortControllerRef.current?.signal.aborted && candidates.length > 0) {
+      if (!wasAborted && candidates.length > 0) {
         setTimeout(() => {
           toast.success(`Analysis complete! Processed ${candidates.length} resumes successfully.`)
         }, 500)
